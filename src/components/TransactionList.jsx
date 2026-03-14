@@ -26,13 +26,13 @@ export default function TransactionList({transactions, onDelete, onEdit}) {
                         <div>
                             <button
                                 onClick={() => onEdit(t)}
-                                className="text-blue-500 text-sm"
+                                className="border bg-white p-2 rounded text-blue-500 text-sm"
                             >
                                 Edit
                             </button>
                             <button
                                 onClick={() => onDelete(t.id)}
-                                className="text-red-500 text-sm"
+                                className="border bg-white p-2 rounded text-red-500 text-sm"
                             >
                                 Delete
                             </button>
