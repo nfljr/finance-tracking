@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from "recharts";
 
 export default function Dashboard() {
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem("darkMode");
+    return saved ? JSON.parse(saved) : false;
+  });
+
   const [transactions, setTransactions] = useState(() => {
     const saved = localStorage.getItem("transactions");
 
@@ -36,10 +42,15 @@ export default function Dashboard() {
   const [date, setDate] = useState("");
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState("");
 
   useEffect(() => {
     localStorage.setItem("transactions", JSON.stringify(transactions));
   }, [transactions]);
+
+  useEffect(() => {
+    localStorage.setItem("darkMode", JSON.stringify(darkMode));
+  }, [darkMode]);
 
   function addTransaction() {
     if (!title.trim() || !amount || !date) return;
@@ -66,6 +77,23 @@ export default function Dashboard() {
     setTransactions(transactions.filter((transactions)=> transactions.id !== id));
   }
 
+  
+  const filteredTransaction = transactions.filter((transactions) => {
+    const keyword = search.toLowerCase();
+
+    const matchSearch = 
+    transactions.title.toLowerCase().includes(keyword) ||
+    transactions.category.toLowerCase().includes(keyword);
+
+    const matchType =
+    filterType === "all" || transactions.type === filterType;
+
+    const matchMonth = 
+      !selectedMonth || transactions.date.startsWith(selectedMonth);
+
+    return matchSearch && matchType && matchMonth;
+  });
+
   function formatRupiah(number) {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -73,11 +101,11 @@ export default function Dashboard() {
     }).format(number);
   }
 
-  const totalIncome = transactions
+  const totalIncome = filteredTransaction
     .filter((transactions)=> transactions.type === "income")
     .reduce((total, transactions) => total + Number(transactions.amount), 0);
 
-  const totalExpense = transactions
+  const totalExpense = filteredTransaction
     .filter((transactions) => transactions.type === "expense")
     .reduce((total, transactions) => total + Number(transactions.amount), 0);
 
@@ -85,7 +113,7 @@ export default function Dashboard() {
 
   const expenseByCategory = {};
 
-  transactions
+  filteredTransaction
     .filter((t) => t.type === "expense")
     .forEach((t) => {
       if (!expenseByCategory[t.category]) {
@@ -100,6 +128,28 @@ export default function Dashboard() {
     value: expenseByCategory[key],
   }));
 
+  const monthlyData = {};
+
+  transactions.forEach((t) => {
+    const month = t.date.slice(0 , 7);
+
+    if (!monthlyData[month]){
+      monthlyData[month] = {
+        month: month,
+        income: 0,
+        expense: 0,
+      };
+    }
+
+    if (t.type === "income") {
+      monthlyData[month].income += t.amount;
+    } else {
+      monthlyData[month].expense += t.amount;
+    }
+  });
+
+  const monthlyChartData = Object.values(monthlyData);
+
   const COLORS = [
     "#3B82F6",
     "#EF4444",
@@ -109,24 +159,22 @@ export default function Dashboard() {
     "#14B8A6",
   ];
 
-  const filteredTransaction =transactions.filter((transactions) => {
-    const keyword = search.toLowerCase();
-
-    const matchSearch = 
-    transactions.title.toLowerCase().includes(keyword) ||
-    transactions.category.toLowerCase().includes(keyword);
-
-    const matchType =
-    filterType === "all" || transactions.type === filterType;
-
-    return matchSearch && matchType;
-  });
-
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-3xl font-bold mb-6">Personal Finance Tracker</h1>
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-            <h2 className="text-xl font-semibold mb-4">
+    <div className={`min-h-screen p-6 ${
+      darkMode ? "bg-gray-900 text-white" : "bg-gray-100"
+    }`}
+    >
+      <h1 className={`text-3xl font-bold mb-6 ${darkMode ? "text-white" : "text-black"}`}>Personal Finance Tracker</h1>
+      <button
+        onClick={() => setDarkMode(!darkMode)}
+        className="px-4 py-2 rounded bg-gray-800 text-white mb-6"
+      >
+        {darkMode ? "☀️light mode" : "🌙dark mode"}
+      </button>
+      <div className={`p-4 rounded-lg shadow mb-6 ${
+        darkMode ? "bg-gray-800" : "bg-white"
+      }`}>
+            <h2 className={`text-xl font-semibold mb-4 ${darkMode ? "text-white" : "text-black"}`}>
               Expense by Category
             </h2>
 
@@ -135,6 +183,7 @@ export default function Dashboard() {
             ) : (
               <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
+                    <Tooltip/>
                     <Pie
                       data={chartData}
                       dataKey="value"
@@ -145,7 +194,7 @@ export default function Dashboard() {
                       }
                     >
                       {chartData.map((entry, index) => (
-                        <cell
+                        <Cell
                           key={index}
                           fill={COLORS[index % COLORS.length]}
                         />
@@ -154,6 +203,27 @@ export default function Dashboard() {
                   </PieChart>
               </ResponsiveContainer>
             )}
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow mb-10">
+            <h2 className="text-xl font-semibold mb-4">
+              Monthly Income vs Expense
+            </h2>
+
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={monthlyChartData}
+                margin={{top:20, right: 20, left: 20, bottom:20}}
+              >
+                <CartesianGrid strokeDasharray="3 3"/>
+                <XAxis dataKey="month" />
+                <YAxis/>
+                <Tooltip/>
+                <Legend/>
+
+                <Bar dataKey="income" fill="#22C55E"/>
+                <Bar dataKey="expense" fill="#EF4444"/>
+              </BarChart>
+            </ResponsiveContainer>
         </div>
         
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -173,14 +243,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <h2 className="text-xl font-semibold mb-4">Add New Transaction</h2>
+      <div className={`p-4 rounded-lg shadow mb-6 ${darkMode ? "bg-gray-800 text-white" : "bg-white"}`}>
+        <h2 className={` text-xl font-semibold mb-4 ${darkMode ? "text-white" : "text-black"} `}>Add New Transaction</h2>
 
         <div className="flex flex-col gap-3">
           <input
             type="text"
             placeholder="Transaction title"
-            className="border p-2 rounded"
+            className={`border p-2 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
@@ -188,13 +258,13 @@ export default function Dashboard() {
           <input
             type="number"
             placeholder="Amount"
-            className="border p-2 rounded"
+            className={`border p-2 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
           />
 
           <select
-            className="border p-2 rounded"
+            className={`border p-2 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
             value={type}
             onChange={(e) => setType(e.target.value)}
           >
@@ -203,7 +273,7 @@ export default function Dashboard() {
           </select>
 
           <select
-            className="border p-2 rounded"
+            className={`border p-2 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
@@ -218,7 +288,7 @@ export default function Dashboard() {
 
           <input
             type="date"
-            className="border p-2 rounded"
+            className={`border p-2 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
             value={date}
             onChange={(e) => setDate(e.target.value)}
           />
@@ -232,19 +302,19 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Transaction List</h2>
+      <div className={`p-4 rounded-lg shadow ${darkMode ? "bg-gray-800 text-white" : "bg-white"}`}>
+        <h2 className={` text-xl font-semibold mb-4 ${darkMode ? "text-white" : "text-black"}`}>Transaction List</h2>
 
         <input 
           type="text" 
           placeholder="search by title or category..."
-          className="border p-2 rounded 2-full mb-4"
+          className={`border p-2 rounded w-full mb-4 ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
 
         <select
-          className="border p-2 rounded w-full mb-4"
+          className={`border p-2 rounded w-full mb-4 ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
         >
@@ -252,6 +322,13 @@ export default function Dashboard() {
           <option value="income">Income</option>
           <option value="expense">Expense</option>
         </select>
+
+        <input 
+          type="month"
+          className={` border p-2 rounded w-full mb-4 ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
+          value={selectedMonth}
+          onChange={(e) => setSelectedMonth(e.target.value)}
+        />
 
         {filteredTransaction.length === 0 ? (
           <p className="text-gray-500">Transaksi Tidak ditemukan.</p>
@@ -263,7 +340,7 @@ export default function Dashboard() {
                 className="border rounded p-3 flex justify-between items-center"
               >
                 <div>
-                  <h3 className="font-semibold text-gray-800">
+                  <h3 className={` font-semibold ${darkMode ? "text-white" : "bg-white"}`}>
                     {transaction.title}
                   </h3>
                   <p className="text-sm text-gray-500">
