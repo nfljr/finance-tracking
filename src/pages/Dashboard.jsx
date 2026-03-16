@@ -43,6 +43,14 @@ export default function Dashboard() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [selectedMonth, setSelectedMonth] = useState("");
+  
+  const [editingId, setEditingId] = useState(null);
+  const [editData, setEditData] = useState({
+    title: "",
+    amount: "",
+    category: "",
+    date: "",
+  });
 
   useEffect(() => {
     localStorage.setItem("transactions", JSON.stringify(transactions));
@@ -75,6 +83,59 @@ export default function Dashboard() {
 
   function deleteTransaction(id){
     setTransactions(transactions.filter((transactions)=> transactions.id !== id));
+  }
+
+  function startEdit(transaction) {
+    setEditingId(transaction.id);
+    setEditData({
+      title: transaction.title,
+      amount: transaction.amount,
+      category: transaction.category,
+      date: transaction.date,
+    });
+  }
+
+  function saveEdit(id){
+    setTransactions(
+      transactions.map((t) => 
+        t.id === id ? {...t,  ...editData, amount: Number(editData.amount) } : t
+      )
+    );
+
+    setEditingId(null);
+  }
+
+  function cancelEdit(){
+    setEditingId(null);
+  }
+
+  function exportCSV() {
+    if (transactions.length === 0) return;
+
+    const headers = ["Title", "Amount", "Type", "Category", "Date"];
+
+    const rows = transactions.map((t) => [
+      t.title,
+      t.amount,
+      t.type,
+      t.category,
+      t.date,
+    ]);
+
+    const csvContent = [
+      headers.join(";"),
+      ...rows.map((row) => row.join(";")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;"});
+
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    link.href = url;
+    link.download = "finance-report.csv";
+
+    link.click();
   }
 
   
@@ -110,6 +171,21 @@ export default function Dashboard() {
     .reduce((total, transactions) => total + Number(transactions.amount), 0);
 
   const balance = totalIncome - totalExpense;
+
+  const transactionCount = filteredTransaction.length;
+
+  const biggestExpense = filteredTransaction
+    .filter((t) => t.type === "expense")
+    .reduce((max,t) => (t.amount > max ? t.amount : max), 0);
+  
+  const averageExpense = 
+    totalExpense === 0
+      ? 0
+      : totalExpense /
+        filteredTransaction.filter((t) => t.type === "expense").length;
+
+  const savingRate = 
+    totalIncome === 0 ? 0 : ((balance / totalIncome) *100).toFixed(1);
 
   const expenseByCategory = {};
 
@@ -164,6 +240,7 @@ export default function Dashboard() {
       darkMode ? "bg-gray-900 text-white" : "bg-gray-100"
     }`}
     >
+      <div>
       <h1 className={`text-3xl font-bold mb-6 ${darkMode ? "text-white" : "text-black"}`}>Personal Finance Tracker</h1>
       <button
         onClick={() => setDarkMode(!darkMode)}
@@ -171,6 +248,62 @@ export default function Dashboard() {
       >
         {darkMode ? "☀️light mode" : "🌙dark mode"}
       </button>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={exportCSV}
+          className="bg-green-600 text-white px-4 py-2 rounded"
+        >
+          Export CSV
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-green-500 text-white p-4 rounded-lg shadow">
+            <h2 className="text-lg font-semibold">Total Income</h2>
+            <p className="text-2xl font-bold mt-2">{formatRupiah(totalIncome)}</p>
+        </div>
+
+        <div className="bg-red-500 text-white p-4 rounded-lg shadow">
+            <h2 className="text-lg font-semibold">Total Expense</h2>
+            <p className="text-2xl font-bold mt-2">{formatRupiah(totalExpense)}</p>
+        </div>
+
+        <div className="bg-blue-500 text-white p-4 rounded-lg shadow">
+            <h2 className="text-lg font-semibold">Balance</h2>
+            <p className="text-2xl font-bold mt-2">{formatRupiah(balance)}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-purple-500 text-white p-4 rounded-lg shadow">
+          <h2 className="text-sm font-semibold">Transaction</h2>
+          <p className="text-2xl font-bold mt-2">
+            {transactionCount}
+          </p>
+        </div>
+        <div className="bg-orange-500 text-white p-4 rounded-lg shadow">
+          <h2 className="text-sm font-semibold">Biggest Expense</h2>
+          <p className="text-2xl font-bold mt-2">
+            {formatRupiah(biggestExpense)}
+          </p>
+        </div>
+        <div className="bg-indigo-500 text-white p-4 rounded-lg shadow">
+          <h2 className="text-sm font-semibold">Average Expense</h2>
+          <p className="text-2xl font-bold mt-2">
+            {formatRupiah(averageExpense || 0)}
+          </p>
+        </div>
+        <div className="bg-teal-500 text-white p-4 rounded-lg shadow">
+          <h2 className="text-sm font-semibold">Saving Rate</h2>
+          <p className="text-2xl font-bold mt-2">
+            {savingRate}%
+          </p>
+        </div>
+
+      </div>
+
       <div className={`p-4 rounded-lg shadow mb-6 ${
         darkMode ? "bg-gray-800" : "bg-white"
       }`}>
@@ -225,23 +358,6 @@ export default function Dashboard() {
               </BarChart>
             </ResponsiveContainer>
         </div>
-        
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-green-500 text-white p-4 rounded-lg shadow">
-            <h2 className="text-lg font-semibold">Total Income</h2>
-            <p className="text-2xl font-bold mt-2">{formatRupiah(totalIncome)}</p>
-        </div>
-
-        <div className="bg-red-500 text-white p-4 rounded-lg shadow">
-            <h2 className="text-lg font-semibold">Total Expense</h2>
-            <p className="text-2xl font-bold mt-2">{formatRupiah(totalExpense)}</p>
-        </div>
-
-        <div className="bg-blue-500 text-white p-4 rounded-lg shadow">
-            <h2 className="text-lg font-semibold">Balance</h2>
-            <p className="text-2xl font-bold mt-2">{formatRupiah(balance)}</p>
-        </div>
-      </div>
 
       <div className={`p-4 rounded-lg shadow mb-6 ${darkMode ? "bg-gray-800 text-white" : "bg-white"}`}>
         <h2 className={` text-xl font-semibold mb-4 ${darkMode ? "text-white" : "text-black"} `}>Add New Transaction</h2>
@@ -339,7 +455,61 @@ export default function Dashboard() {
                 key={transaction.id}
                 className="border rounded p-3 flex justify-between items-center"
               >
-                <div>
+              {editingId === transaction.id ? (
+                <div className="flex flex-col gap-2 w-full">
+                   <input
+                      type="text"
+                      placeholder="Transaction title"
+                      className={`border p-2 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
+                      value={editData.title}
+                      onChange={(e) => setEditData({...editData, title: e.target.value})}
+                  />
+
+                  <input type="number" 
+                    className={`border p-1 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
+                    value={editData.amount}
+                    onChange={(e) => setEditData({...editData, amount: e.target.value})}
+                  />
+
+                  <input type="date" 
+                    className={`border p-1 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
+                    value={editData.date}
+                    onChange={(e) => setEditData({...editData, date: e.target.value})}
+                  />
+
+                  <select
+                    className={`border p-1 rounded ${darkMode ? "bg-gray-700 text-white" : "bg-white"}`}
+                    value={editData.category}
+                    onChange={(e) => setEditData({...editData, category: e.target.value})}
+                  >
+                    <option>Food</option>
+                    <option>Transport</option>
+                    <option>Shopping</option>
+                    <option>Bills</option>
+                    <option>Salary</option>
+                    <option>Freelance</option>
+                    <option>Other</option>
+                  </select>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => saveEdit(transaction.id)}
+                      className="bg-green-500 text-white px-3 py-1 rounded"
+                    >
+                        Save
+                    </button>
+
+                    <button
+                      onClick={cancelEdit}
+                      className="bg-gray-500 text-white px-3 py-1 rounded"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ): (
+                <>
+                  <div>
                   <h3 className={` font-semibold ${darkMode ? "text-white" : "bg-white"}`}>
                     {transaction.title}
                   </h3>
@@ -362,14 +532,24 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-500 capitalize">
                     {transaction.type}
                   </p>
-
-                  <button
-                    onClick={() => deleteTransaction(transaction.id)}
-                    className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
-                  >
-                    Delete
-                  </button>
+                  <div className="flex gap-2 mt-2 justify-end">
+                    <button
+                      onClick={() => startEdit(transaction)}
+                      className="bg-yellow-500 text-white px-2 py-1 rounded text-sm"
+                    >
+                      Edit
+                    </button>
+                    
+                    <button
+                      onClick={() => deleteTransaction(transaction.id)}
+                      className="bg-red-500 text-white px-3 py-1 rounded text-sm"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
+                </>
+              )}
               </div>
             ))}
           </div>
